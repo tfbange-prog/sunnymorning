@@ -9,6 +9,7 @@
   2. 否則依日期輪播 images/ 資料夾裡的圖，依檔名排序，輪完再從頭開始
 """
 import os
+import re
 import sys
 import json
 import uuid
@@ -23,13 +24,23 @@ EPOCH = datetime(2026, 1, 1, tzinfo=TZ).date()
 
 
 def pick_image(today):
-    special = os.path.join(ROOT, 'special', today.strftime('%m-%d') + '.jpg')
-    if os.path.exists(special):
-        return 'special/' + os.path.basename(special)
-    pool = sorted(f for f in os.listdir(os.path.join(ROOT, 'images')) if f.lower().endswith(('.jpg', '.jpeg', '.png')))
+    md = today.strftime('%m-%d')
+    # 節日專屬圖：最外層的 special_12-25.jpg，或 special/12-25.jpg
+    for rel in ('special_%s.jpg' % md, 'special/%s.jpg' % md):
+        if os.path.exists(os.path.join(ROOT, rel)):
+            return rel
+    # 每日輪播圖：檔名 d01.jpg、d02.jpg…，放在最外層或 images/ 資料夾都可以
+    pool = []
+    for folder in ('', 'images'):
+        path = os.path.join(ROOT, folder)
+        if os.path.isdir(path):
+            for f in os.listdir(path):
+                if re.match(r'^d\d+\.(jpg|jpeg|png)$', f, re.I):
+                    pool.append((f.lower(), f if not folder else folder + '/' + f))
     if not pool:
-        sys.exit('images 資料夾是空的')
-    return 'images/' + pool[(today - EPOCH).days % len(pool)]
+        sys.exit('找不到早安圖：請把 d01.jpg、d02.jpg… 放在專案最外層')
+    pool = [rel for _, rel in sorted(pool)]
+    return pool[(today - EPOCH).days % len(pool)]
 
 
 def raw_url(rel_path):
