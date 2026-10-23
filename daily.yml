@@ -1,0 +1,38 @@
+name: 每日早安圖
+
+on:
+  schedule:
+    - cron: '0 23 * * *'   # UTC 23:00 = 台北時間 每天早上 07:00（GitHub 可能延遲幾分鐘）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '試跑（true = 只檢查不發送）'
+        default: 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 發送今天的早安圖
+        env:
+          LINE_TOKEN: ${{ secrets.LINE_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '' }}
+        run: python3 send.py
+
+      # 每月 1 號更新一次紀錄檔，避免 GitHub 因 60 天沒活動而自動停用排程
+      - name: 保持專案活躍
+        if: github.event_name == 'schedule'
+        run: |
+          if [ "$(date +%d)" = "01" ]; then
+            date > last_run.txt
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add last_run.txt
+            git commit -m "keepalive" || true
+            git push || true
+          fi
